@@ -7,14 +7,21 @@ from torchmetrics.image.fid import FrechetInceptionDistance
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from skimage.util import random_noise
+import numpy as np
+import random
+import seaborn as sns
+import itertools
 
 def load_data_single(loader, sample, dims):
     _, (img, targets) = next(enumerate(loader))
     loaded_tensor = img.expand([sample, 3, dims[0], dims[1]])
     return loaded_tensor
 
-def load_generated(location, num):
+def load_from_dir(location, rand_seed=None):
     directory = glob.glob(location)
+    if rand_seed is not None:
+        random.seed(rand_seed)
+        directory = random.sample(directory, 100)
     image_array = []
     for img in directory:
         image = transforms.functional.pil_to_tensor(Image.open(img))
@@ -50,7 +57,6 @@ def compute_FID(image_r, image_f):
     FID = fid.compute()
     return FID
 
-
 def encode_image(img):
     transform = transforms.Compose([transforms.PILToTensor()])
     return transform(img)
@@ -76,7 +82,7 @@ def plot_FID(factor_array, transformation, transform_name, dataset_train, datase
 
 def generate_heatmap(dataset_train, dataset_test, dataset):
     kernel_sizes = np.arange(1, 13, 2)
-    coords = np.array(list(product(kernel_sizes, kernel_sizes)))
+    coords = np.array(list(itertools.product(kernel_sizes, kernel_sizes)))
     heat_matrix = np.zeros((6, 6))
     for c in coords:
         heat_matrix[c[0]//2, c[1]//2] = compute_transform_FID(
@@ -85,9 +91,9 @@ def generate_heatmap(dataset_train, dataset_test, dataset):
     plot.get_figure().savefig('plots/' + dataset + '_blurring_FID.png', dpi=400)
     return None
 
-def noisify_FID(amount, dataset_train, dataset_test, print_pic=False):
+def noisify_FID(amount, dataset_train, dataset_test, print_pic=False, seed=128):
     noised_test = torch.clone(dataset_test)
-    noised_test = torch.tensor(random_noise(noised_test, mode="s&p", rng=seed, amount=amount))
+    noised_test = torch.tensor(random_noise(noised_test, mode="s&p", rng=234, amount=amount))
     noised_test = noised_test*255
     noised_test = noised_test.type(torch.uint8)
     if print_pic:
